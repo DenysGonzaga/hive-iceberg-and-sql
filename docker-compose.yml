@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: metastore_db
+      POSTGRES_USER: hive
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    container_name: postgres
+    restart: unless-stopped
+
+  metastore:
+    image: apache/hive:4.0.0
+    ports:
+      - "9083:9083"
+    environment:
+      - SERVICE_NAME=metastore
+      - DB_DRIVER=postgres
+      - SERVICE_OPTS=-Djavax.jdo.option.ConnectionDriverName=org.postgresql.Driver -Djavax.jdo.option.ConnectionURL=jdbc:postgresql://postgres:5432/metastore_db -Djavax.jdo.option.ConnectionUserName=hive -Djavax.jdo.option.ConnectionPassword=password
+    volumes:
+      - ./warehouse:/opt/hive/data/warehouse
+      - ./jars/postgresql-42.7.3.jar:/opt/hive/lib/postgresql-42.7.3.jar
+    depends_on:
+      - postgres
+    container_name: metastore-standalone
+    restart: unless-stopped
+
+  hiveserver2:
+    image: apache/hive:4.0.0
+    ports:
+      - "10000:10000"
+      - "10002:10002"
+    environment:
+      - SERVICE_NAME=hiveserver2
+      - SERVICE_OPTS=-Dhive.metastore.uris=thrift://metastore:9083
+      - IS_RESUME=true
+    volumes:
+      - ./warehouse:/opt/hive/data/warehouse
+    depends_on:
+      - metastore
+    container_name: hiveserver2
+    restart: unless-stopped
+
+volumes:
+  warehouse:
+  pgdata:
